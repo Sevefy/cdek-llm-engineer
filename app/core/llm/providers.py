@@ -14,7 +14,7 @@ def get_openai(settings: LLMSettings) -> BaseChatModel:
     return ChatOpenAI(
         model=settings.model_name,
         temperature=settings.temperature,
-        api_key=settings.open_api_key,
+        api_key=settings.openai_api_key,
         base_url=settings.openai_url,
         max_retries=5
     )
