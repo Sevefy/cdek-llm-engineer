@@ -7,7 +7,8 @@ from app.routes import chat
 from app.core import doc_store
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):        
+async def lifespan(app: FastAPI): 
+    """Загрузка"""       
     loader = LoadDocuments("data")
     loader.load(doc_store)
     yield
