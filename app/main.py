@@ -14,7 +14,6 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    debug=True,
     title="CDEK Chat",
     description="Тестовое задание на LLM-инженера",
     version="0.0.1",
