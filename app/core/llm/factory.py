@@ -5,6 +5,7 @@ from app.core.llm.providers import PROVIDERS_MAP
 
 
 def get_llm(settings: LLMSettings) -> BaseChatModel:
+    """Создание модели исходя из настроек"""
     provider = settings.provider
     if provider not in PROVIDERS_MAP:
         raise ValueError("Модель не поддерживается")
