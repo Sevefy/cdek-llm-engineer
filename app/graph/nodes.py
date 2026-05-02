@@ -1,59 +1,50 @@
-from langchain_core.exceptions import OutputParserException
 
-from app.core import document_store
 from app.graph.state import ChatState
-from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from langchain_core.messages import SystemMessage, BaseMessage
 
 from app.schemas.llm import RouteDecision
 from langchain_core.language_models import BaseChatModel
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-@retry(
-    stop=stop_after_attempt(3),                    # максимум 3 попытки
-    wait=wait_exponential(multiplier=1, min=1, max=4),  # экспоненциальная задержка
-    retry=retry_if_exception_type((OutputParserException, Exception)),
-    reraise=True
-)
 async def route_message(llm: BaseChatModel, messages: list[BaseMessage] | BaseMessage) -> RouteDecision:
     """Извлечение инфомации о пользователе исходя из контекста"""
-    system_prompt = """Ты — роутер чат-бота программы международной стажировки.
-Твоя задача — анализировать ВСЕ предыдущие сообщения и текущее сообщение пользователя. 
-Если у тебя уже есть информация о стране и статусе студента из предыдущих сообщений — просто верни JSON с этими данными, needs_clarification=false.
-Определи страну в которой пользователь собирается проходить стажировку.
-ВСЕГДА указывай почему ты принял такое решение в поле reasoning
+    system_prompt = """Ты — точный JSON-роутер для чат-бота стажировки CdekStart.
 
-Анализируй сообщение пользователя.
-Отвечай **строго** в формате JSON. Никакого другого текста быть не должно.
+Твоя единственная задача — анализировать историю диалога и текущее сообщение пользователя, после чего вернуть **строго валидный JSON**.
+
+Никогда не пиши ничего кроме JSON. Никаких объяснений, никакого markdown.
 
 {
-  "reasoning": "короткое объяснение",
+  "reasoning": "короткое объяснение твоего решения",
   "detected_country": "germany" или "france" или null,
-  "detected_student": true/false/null,
-  "needs_clarification": true/false,
-  "clarification_question": "вопрос или null",
-  "can_answer": true/false
+  "detected_student": true или false или null,
+  "needs_clarification": true или false,
+  "clarification_question": "вопрос пользователю или null",
+  "can_answer": true или false
 }
 
-Правила:
-- Если пользователь явно указывает Германию/Germany/Берлин, то detected_country = "germany"
-- Если пользователь явно указывает Францию/France/Париж, то detected_country = "france"
-- Если страна не указана явно, то needs_clarification = true и заполни clarification_question
-- Если needs_clarification = true, то добавь в clarification_question что стажировка может быть только во Франции и Германии
-- Если ты смог определить страну, запиши ее в detected_country: france, germany, null
-- Если пользователь явно указывает что он студент последнего курса, то detected_student=True
-- Если пользователь явно указывает что он не студент, то detected_student=False
-- Если невозможно определить является пользователь студентом или нет, то needs_clarification = true и заполни clarification_question
-- Если в clarification_question вопрос является ли пользователь студентом, то укажи в вопросе, что стажировка только для студентов последних курсов
-- Обязательно заполни поля: reasoning, needs_clarification
-- Отвечай **только** валидным JSON согласно схеме.
+Ключевые правила:
+- Если пользователь явно называет страну (Германия, Germany, Франция, France, Берлин, Париж и т.п.) — установи detected_country.
+- Если пользователь меняет страну — обнови detected_country.
+- Если пользователь говорит, что он студент последнего курса — detected_student = true.
+- Если говорит, что не студент — detected_student = false.
+- Если информации достаточно для ответа — needs_clarification = false и can_answer = true.
+- Если нужно уточнить страну или статус студента — needs_clarification = true и напиши понятный clarification_question.
+
+Отвечай **только JSON**. Даже если ты уверен — всё равно верни JSON.
 """
 
-    structured_llm = llm.with_structured_output(RouteDecision, method="json_schema")
+    if isinstance(messages, BaseMessage):
+        messages = [messages]
+    full_messages = [SystemMessage(content=system_prompt)] + messages
+    
+    structured_llm = llm.with_structured_output(RouteDecision, method="json_schema", include_raw=True)
+    raw_result = await structured_llm.ainvoke(full_messages)
+    if raw_result.get('parsing_error'):
+        raw_text = getattr(raw_result['raw'], 'content', str(raw_result['raw']))
+        raise Exception(f"RAW_RESPONSE:{raw_text}")
 
-    messages = [SystemMessage(content=system_prompt)] + messages if isinstance(messages, list) else [messages]
+    return raw_result['parsed']
 
-    result = await structured_llm.ainvoke(messages)
-    return result
 
         
         
@@ -76,7 +67,7 @@ async def answer_message(llm: BaseChatModel, state: ChatState) -> dict:
 
     messages = [
         SystemMessage(content=system_prompt),
-        *state.messages[-5:]   # последние 5 сообщений для контекста диалога
+        *state.messages[-20:]   # последние 20 сообщений для контекста диалога
     ]
 
     response = await llm.ainvoke(messages)

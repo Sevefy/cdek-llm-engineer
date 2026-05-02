@@ -24,7 +24,7 @@ async def router_node(state: ChatState):
         return {
         }
         
-    recent_messages = state.messages[-10:]
+    recent_messages = state.messages[-20:]
     try:
         decision = await route_message(llm, recent_messages)
         
@@ -35,14 +35,16 @@ async def router_node(state: ChatState):
             "clarification_question": decision.clarification_question,
         }
     except Exception as e:
-        print(f"Router failed after retries: {e}")
-        # задаём уточняющий вопрос
-        return {
-            "needs_clarification": True,
-            "clarification_question": "В какой стране вы планируете проходить стажировку? Германия или Франция?",
-            "detected_country": None,
-            "detected_student": None,
-        }
+        print(f"Router failed: {e}")
+        if state.detected_country:
+            return {
+                "needs_clarification": False,
+            }
+        else:
+            return {
+                "needs_clarification": True,
+                "clarification_question": "В какой стране вы планируете проходить стажировку? Германия или Франция?",
+            }
 
 async def clarification_node(state: ChatState):
     """Узел для уточнения"""
