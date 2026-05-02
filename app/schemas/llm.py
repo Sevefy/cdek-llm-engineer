@@ -4,7 +4,7 @@ from typing import Literal, Optional
 class RouteDecision(BaseModel):
     """Схема роутера, полученный ответ в route_node от модели"""
     reasoning: str = Field(
-        ..., 
+        None, 
         description="Краткое объяснение, почему ты принял такое решение"
     )
     detected_country: Optional[Literal["germany", "france"]] = Field(
@@ -16,7 +16,7 @@ class RouteDecision(BaseModel):
         description="Пользователь - студеет последнего курса или нет. True - студент последнего курса. False - не студент последнего курса"
     )
     needs_clarification: bool = Field(
-        ..., 
+        False, 
         description="True, если нужно задать уточняющий вопрос про страну или является ли он студентом"
     )
     clarification_question: Optional[str] = Field(
