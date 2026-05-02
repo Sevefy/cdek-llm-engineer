@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal, Optional
 
 class LLMSettings(BaseSettings):
-
+    """Конфигурация LLM"""
     model_config = SettingsConfigDict(
         env_prefix="LLM_",
         env_file=".env",
@@ -13,7 +13,6 @@ class LLMSettings(BaseSettings):
     
     model_name: str = "llama3.2:3b"
     temperature: float = 0.0
-    max_tokens: Optional[int] = None
     
     openai_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
